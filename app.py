@@ -5,7 +5,7 @@ from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import base64
 from Crypto.Cipher import AES
 import hashlib
-import traceback  # 追加
+import traceback
 
 app = Flask(__name__)
 
@@ -15,23 +15,25 @@ CHANNEL_ACCESS_TOKEN = 'jGdIeEGvFXp3+kXYmXHPl0SAxe9ME8Zq6poNv3OmTtJqHzuWBZ+pFnjb
 line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
-# AES暗号化用関数（共通鍵で暗号化・Base64エンコード）
+# --- ここが修正版 ---
 def encrypt_message(key, message):
     key_hash = hashlib.sha256(key.encode('utf-8')).digest()
     cipher = AES.new(key_hash, AES.MODE_EAX)
     nonce = cipher.nonce
     ciphertext, tag = cipher.encrypt_and_digest(message.encode('utf-8'))
-    return base64.b64encode(nonce + ciphertext).decode('utf-8')
+    # nonce, tag, ciphertext を結合してbase64エンコード
+    return base64.b64encode(nonce + tag + ciphertext).decode('utf-8')
 
-# AES復号用関数（共通鍵で復号・Base64デコード）
 def decrypt_message(key, encrypted_message):
     key_hash = hashlib.sha256(key.encode('utf-8')).digest()
     encrypted_data = base64.b64decode(encrypted_message)
     nonce = encrypted_data[:16]
-    ciphertext = encrypted_data[16:]
+    tag = encrypted_data[16:32]
+    ciphertext = encrypted_data[32:]
     cipher = AES.new(key_hash, AES.MODE_EAX, nonce=nonce)
-    decrypted = cipher.decrypt(ciphertext)
+    decrypted = cipher.decrypt_and_verify(ciphertext, tag)
     return decrypted.decode('utf-8')
+# --- ここまで修正版 ---
 
 @app.route("/", methods=["POST"])
 def callback():
