@@ -22,6 +22,16 @@ def encrypt_message(key, message):
     ciphertext, tag = cipher.encrypt_and_digest(message.encode('utf-8'))
     return base64.b64encode(nonce + ciphertext).decode('utf-8')
 
+# AES復号用関数（共通鍵で復号・Base64デコード）
+def decrypt_message(key, encrypted_message):
+    key_hash = hashlib.sha256(key.encode('utf-8')).digest()
+    encrypted_data = base64.b64decode(encrypted_message)
+    nonce = encrypted_data[:16]
+    ciphertext = encrypted_data[16:]
+    cipher = AES.new(key_hash, AES.MODE_EAX, nonce=nonce)
+    decrypted = cipher.decrypt(ciphertext)
+    return decrypted.decode('utf-8')
+
 @app.route("/", methods=["POST"])
 def callback():
     signature = request.headers["X-Line-Signature"]
@@ -38,7 +48,6 @@ def handle_message(event):
 
     if text.startswith('/encode '):
         try:
-            # コマンド構造: /encode キーワード メッセージ本文
             parts = text.split(' ', 2)
             if len(parts) < 3:
                 reply_text = '使い方: /encode キーワード メッセージ'
@@ -49,8 +58,22 @@ def handle_message(event):
                 reply_text = f'暗号文: {encrypted}'
         except Exception as e:
             reply_text = f'エラー: {str(e)}'
+
+    elif text.startswith('/decode '):
+        try:
+            parts = text.split(' ', 2)
+            if len(parts) < 3:
+                reply_text = '使い方: /decode キーワード 暗号文'
+            else:
+                key = parts[1]
+                encrypted_msg = parts[2]
+                decrypted = decrypt_message(key, encrypted_msg)
+                reply_text = f'復号文: {decrypted}'
+        except Exception as e:
+            reply_text = f'復号エラー: {str(e)}'
+
     else:
-        reply_text = '「/encode キーワード メッセージ」で暗号化できます'
+        reply_text = '「/encode キーワード メッセージ」で暗号化、「/decode キーワード 暗号文」で復号化できます'
 
     line_bot_api.reply_message(
         event.reply_token,
