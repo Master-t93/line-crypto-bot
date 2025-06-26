@@ -5,6 +5,7 @@ from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import base64
 from Crypto.Cipher import AES
 import hashlib
+import traceback  # 追加
 
 app = Flask(__name__)
 
@@ -70,6 +71,8 @@ def handle_message(event):
                 decrypted = decrypt_message(key, encrypted_msg)
                 reply_text = f'復号文: {decrypted}'
         except Exception as e:
+            error_message = traceback.format_exc()
+            print(f'復号処理でエラー発生:\n{error_message}')
             reply_text = f'復号エラー: {str(e)}'
 
     else:
